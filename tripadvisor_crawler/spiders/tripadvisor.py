@@ -1,5 +1,27 @@
 # -*- coding: utf-8 -*-
 from scrapy import Request, Spider
+from ..items import Attraction
+
+class TripadvisorAttractionSpider(Spider):
+    name='tripadvisor_attraction'
+    allowed_domains = ['tripadvisor.fr']
+
+    def start_requests(self):
+        # g187147 is Paris
+        for i in [187147]:
+            link = "https://tripadvisor.fr/Attraction_Review-g%s"%i
+            yield Request(link, callback=self.parse_attractions, meta={ 'g_value':i })
+
+    def parse_attractions(self, response):
+        name = response.xpath('//*[@id="HEADING"]/text()').extract()[0]\
+            .replace(' : les meilleures activités', '')\
+            .replace('\n', '')\
+            .replace('\u200e', '')
+        g_value = response.meta['g_value']
+        yield Attraction(
+            name = name,
+            g_value = g_value
+        )
 
 
 class TripadvisorSpider(Spider):
