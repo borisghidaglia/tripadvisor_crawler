@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
 from scrapy import Request, Spider
 from ..items import Attraction, AttractionReview
-from ..utils import TripadvisorMongoDB, get_d_values
+from ..utils import get_d_values, get_g_values, TripadvisorMongoDB
 
 class TripadvisorAttractionSpider(Spider):
+    """ Crawl all the attractions indexed by their d_values in the file data.py
+
+    The g_values_to_crawl object could be a list of int, a range() of some value or anything else as long as
+    it's iterable and contains int
+    """
     name='tripadvisor_attraction'
     allowed_domains = ['tripadvisor.fr']
 
     def start_requests(self):
-        # g187147 is Paris
-        for i in [187147]:
+        for i in get_g_values():
             link = "https://tripadvisor.fr/Attraction_Review-g%s"%i
             yield Request(link, callback=self.parse_attractions, meta={ 'g_value':i })
 
@@ -35,7 +39,7 @@ class TripadvisorAttractionReviewSpider(Spider):
 
     def start_requests(self):
         """ For each attraction in database, start crawling the attraction_review indexed by their
-        d_values in the "d_value_by_attraction.json" file
+        d_values in the "d_values_by_attraction.json" file
         """
         for attraction in self.attractions:
             d_values = get_d_values(attraction['name'])
@@ -58,8 +62,6 @@ class TripadvisorAttractionReviewSpider(Spider):
             g_value = response.meta['g_value'],
             d_value = response.meta['d_value']
         )
-
-
 
 
 

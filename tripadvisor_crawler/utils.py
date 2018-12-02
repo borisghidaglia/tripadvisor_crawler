@@ -37,15 +37,28 @@ class TripadvisorMongoDB(DatabaseMongo):
 def get_d_values(attraction_name):
     """Return d_values related to this attraction name
 
-    Returned d_values are fetched from the json 'd_value_by_attraction.json'.
+    Returned d_values are fetched from the json 'd_values_by_attraction.json'.
     This file allows to chose specific d_values we want to crawl.
 
     Keyword arguments:
     attraction_name -- name of the attraction related to the d_values wanted
     """
     try:
-        with open('./tripadvisor_crawler/spiders/d_value_by_attraction.json') as file:
+        with open('./tripadvisor_crawler/spiders/d_values_by_attraction.json') as file:
             data = json.load(file)
         return data['attraction'][attraction_name]
     except Exception as e:
-        raise Exception('Exception : %s -- did you created "d_value_by_attraction.json" ?'%(e))
+        raise Exception('Exception : %s -- did you created "d_values_by_attraction.json" ?'%(e))
+
+def get_g_values():
+    """Return g_values
+
+    Returned g_values are fetched from the json 'g_values.json'.
+    This file allows to chose specific g_values we want to crawl.
+    """
+    try:
+        with open('./tripadvisor_crawler/spiders/g_values.json') as file:
+            data = json.load(file)
+        return data['g_values']
+    except Exception as e:
+        raise Exception('Exception : %s -- did you created "g_values.json" ?'%(e))
