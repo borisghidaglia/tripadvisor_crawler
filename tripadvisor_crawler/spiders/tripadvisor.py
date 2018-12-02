@@ -64,23 +64,58 @@ class TripadvisorAttractionReviewSpider(Spider):
         )
 
 
-
-class TripadvisorSpider(Spider):
-    name = 'tripadvisor'
+class TripadvisorReviewSpider(Spider):
+    name = 'tripadvisor_review'
     allowed_domains = ['tripadvisor.fr']
-    start_urls = ['https://tripadvisor.fr/Attraction_Review-g187147-d188151-Reviews-Eiffel_Tower-Paris_Ile_de_France.html']
 
-    def parse(self, response):
-        # ids = response.xpath('//*[@class="member_info"]/div/@id').extract()
-        # for id in ids:
-        #     print(id)
+    def __init__(self, category=None, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.attraction_reviews = TripadvisorMongoDB().get_collection('tripadvisor_attraction_review')
+
+    def start_requests(self):
+        for attraction_review in self.attraction_reviews:
+            link = "https://www.tripadvisor.fr/Attraction_Review-g%s-d%s"%(attraction_review['g_value'], attraction_review['d_value'])
+            yield Request(
+                link,
+                callback=self.parse_review_pages,
+                meta={'attraction_review' : attraction_review}
+            )
+
+    def parse_review_pages(self, response):
+        attraction_review = response.meta['attraction_review']
         nb_pages = int(response.xpath('//*[@id="taplc_location_reviews_list_resp_ar_responsive_0"]/div/div[15]/div/div/div/a[8]/text()').extract()[0])
-        for i in range(0, 10):
-            link = "https://www.tripadvisor.fr/Attraction_Review-g187147-d188151-Reviews-or%s-Eiffel_Tower-Paris_Ile_de_France.html"%(i*10)
-            yield Request(link, callback=self.parse_comments)
+        for i in range(0, 2):
+            link = "https://www.tripadvisor.fr/Attraction_Review-g%s-d%s-Reviews-or%s-Eiffel_Tower-Paris_Ile_de_France.html"\
+                %(attraction_review['g_value'], attraction_review['d_value'], i*10)
+            yield Request(
+                link,
+                callback=self.parse_uid_and_src
+            )
 
-    def parse_comments(self, response):
-        html_ids = response.xpath('//*[@class="member_info"]/div/@id').extract()
-        for html_id in html_ids:
-            [uid, src] = html_id.replace('UID_','').replace('SRC_','').split('-')
-            print(uid, src)
+    def parse_uid_and_src(self, response):
+        # Extracting titles, contents and grades
+        titles = response.xpath('//*[@class="noQuotes"]/text()').extract()
+        contents = response.xpath('//*[@class="partial_entry"]/text()').extract()
+        # grades = response.xpath('//*[@class="ui_column"]')
+        class_grades = response.xpath('//*[contains(@class,"ui_bubble_rating")]/@class').extract()
+        grades = []
+        for grade in class_grades:
+            grades.append(int(grade.split(' ')[1].replace('bubble_', '')))
+        print("################################################")
+        print(titles)
+        print("################################################")
+        print(contents)
+        print("################################################")
+        print(grades)
+        # for i in range(len(titles)):
+        #     print(titles[i], contents[i], grades[i])
+        # for title, content, grade in zip(titles, contents, grades):
+        #     print(title, content, grade)
+        # for html_id in html_ids:
+        #     [uid, src] = html_id.replace('UID_','').replace('SRC_','').split('-')
+        #     link = "https://www.tripadvisor.fr/MemberOverlay?uid=%s&c=&src=%s"\
+        #         %(uid, src)
+        #     yield Request(
+        #         link,
+        #
+        #     )
