@@ -12,8 +12,8 @@ class TripadvisorSpider(Spider):
         # for id in ids:
         #     print(id)
         nb_pages = int(response.xpath('//*[@id="taplc_location_reviews_list_resp_ar_responsive_0"]/div/div[15]/div/div/div/a[8]/text()').extract()[0])
-        for i in range(0, 10, 10):
-            link = "https://www.tripadvisor.fr/Attraction_Review-g187147-d188151-Reviews-or%s-Eiffel_Tower-Paris_Ile_de_France.html"%i
+        for i in range(0, 10):
+            link = "https://www.tripadvisor.fr/Attraction_Review-g187147-d188151-Reviews-or%s-Eiffel_Tower-Paris_Ile_de_France.html"%i*10
             yield Request(link, callback=self.parse_users)
 
     def parse_comments(self, response):
