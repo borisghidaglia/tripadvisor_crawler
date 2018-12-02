@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from scrapy import Request, Spider
-from ..items import Attraction
+from ..items import Attraction, AttractionReview
+from ..utils import TripadvisorMongoDB, get_d_values
 
 class TripadvisorAttractionSpider(Spider):
     name='tripadvisor_attraction'
@@ -22,6 +23,44 @@ class TripadvisorAttractionSpider(Spider):
             name = name,
             g_value = g_value
         )
+
+
+class TripadvisorAttractionReviewSpider(Spider):
+    name='tripadvisor_attraction_review'
+    allowed_domains = ['tripadvisor.fr']
+
+    def __init__(self, category=None, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.attractions = TripadvisorMongoDB().get_collection('tripadvisor_attraction')
+
+    def start_requests(self):
+        """ For each attraction in database, start crawling the attraction_review indexed by their
+        d_values in the "d_value_by_attraction.json" file
+        """
+        for attraction in self.attractions:
+            d_values = get_d_values(attraction['name'])
+            if d_values:
+                for d_value in d_values:
+                    link = "https://www.tripadvisor.fr/Attraction_Review-g%s-d%s"%(attraction['g_value'], d_value)
+                    yield Request(
+                        link,
+                        callback = self.parse_attraction_review,
+                        meta = {
+                            'g_value' : attraction['g_value'],
+                            'd_value' : d_value
+                        }
+                    )
+
+    def parse_attraction_review(self, response):
+        name = response.xpath('//*[@id="HEADING"]/text()').extract()[0]
+        yield AttractionReview(
+            name = name,
+            g_value = response.meta['g_value'],
+            d_value = response.meta['d_value']
+        )
+
+
+
 
 
 class TripadvisorSpider(Spider):
