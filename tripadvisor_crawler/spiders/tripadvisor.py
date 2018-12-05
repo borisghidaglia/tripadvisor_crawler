@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from scrapy import Request, Spider
-from ..items import Attraction, AttractionReview
+from ..items import Attraction, AttractionReview, Review, User
 from ..utils import get_d_values, get_g_values, TripadvisorMongoDB
 
 class TripadvisorAttractionSpider(Spider):
@@ -70,6 +70,54 @@ class TripadvisorReviewSpider(Spider):
 
     def __init__(self, category=None, *args, **kwargs):
             super().__init__(*args, **kwargs)
+            self.users = TripadvisorMongoDB().get_collection('tripadvisor_user')
+
+    def start_requests(self):
+        for user in self.users:
+            link = "https://www.tripadvisor.fr/Profile/%s"%(user['username'])
+            yield Request(
+                link,
+                callback=self.parse_review,
+                meta={'username' : user['username']}
+            )
+
+    def parse_review(self, response):
+        review_ids = [ review_id.split('-')[3].replace('r','') for review_id in response\
+            .xpath('//*[@class="social-sections-ReviewSection__review_wrap--1Gzlk"]/a/@href')\
+            .extract()]
+        titles = response.xpath('//*[@class="social-sections-ReviewSection__title--HIMCX"]/text()')\
+            .extract()
+        contents = response.xpath('//*[@class="social-sections-ReviewSection__quote--1AUX1"]/text()')\
+            .extract()
+        grades = [ int(grade.replace('ui_bubble_rating bubble_', '')) for grade in response\
+            .xpath('//*[contains(@class,"ui_bubble_rating ")]/@class').extract()]
+        attraction_review_names = [ attraction_review_name.replace('ui_bubble_rating bubble_', '') for attraction_review_name in response\
+            .xpath('//*[contains(@class,"social-common-POIObject__poi_name--39wh4")]/text()').extract()]
+        attraction_review_gs_ds = ['-'.join(attraction_review_g_d.split('-')[1:3]) for attraction_review_g_d\
+            in response.xpath('//*[@class="social-sections-POICarousel__item--1Sbpp"]/div/a/@href')\
+            .extract()]
+        username = response.meta['username']
+
+        for review_id, title, content, grade, attraction_review_name, attraction_review_g_d\
+            in zip(review_ids, titles, contents, grades, attraction_review_names, attraction_review_gs_ds):
+            return Review(
+                review_id = review_id,
+                title = title,
+                content = content,
+                grade = grade,
+                attraction_review_name = attraction_review_name,
+                attraction_review_g_d = attraction_review_g_d,
+                username = username
+            )
+
+
+
+class TripadvisorUserSpider(Spider):
+    name = 'tripadvisor_user'
+    allowed_domains = ['tripadvisor.fr']
+
+    def __init__(self, category=None, *args, **kwargs):
+            super().__init__(*args, **kwargs)
             self.attraction_reviews = TripadvisorMongoDB().get_collection('tripadvisor_attraction_review')
 
     def start_requests(self):
@@ -84,38 +132,44 @@ class TripadvisorReviewSpider(Spider):
     def parse_review_pages(self, response):
         attraction_review = response.meta['attraction_review']
         nb_pages = int(response.xpath('//*[@id="taplc_location_reviews_list_resp_ar_responsive_0"]/div/div[15]/div/div/div/a[8]/text()').extract()[0])
-        for i in range(0, 2):
+        for i in range(nb_pages):
             link = "https://www.tripadvisor.fr/Attraction_Review-g%s-d%s-Reviews-or%s-Eiffel_Tower-Paris_Ile_de_France.html"\
                 %(attraction_review['g_value'], attraction_review['d_value'], i*10)
             yield Request(
                 link,
-                callback=self.parse_uid_and_src
+                callback=self.parse_uid_and_src,
+                meta = { 'attraction_review_name' : attraction_review['name'] }
             )
 
     def parse_uid_and_src(self, response):
-        # Extracting titles, contents and grades
-        titles = response.xpath('//*[@class="noQuotes"]/text()').extract()
-        contents = response.xpath('//*[@class="partial_entry"]/text()').extract()
-        # grades = response.xpath('//*[@class="ui_column"]')
-        class_grades = response.xpath('//*[contains(@class,"ui_bubble_rating")]/@class').extract()
-        grades = []
-        for grade in class_grades:
-            grades.append(int(grade.split(' ')[1].replace('bubble_', '')))
-        print("################################################")
-        print(titles)
-        print("################################################")
-        print(contents)
-        print("################################################")
-        print(grades)
-        # for i in range(len(titles)):
-        #     print(titles[i], contents[i], grades[i])
-        # for title, content, grade in zip(titles, contents, grades):
-        #     print(title, content, grade)
-        # for html_id in html_ids:
-        #     [uid, src] = html_id.replace('UID_','').replace('SRC_','').split('-')
-        #     link = "https://www.tripadvisor.fr/MemberOverlay?uid=%s&c=&src=%s"\
-        #         %(uid, src)
-        #     yield Request(
-        #         link,
-        #
-        #     )
+        html_ids = response.xpath('//*[@class="member_info"]/div/@id').extract()
+
+        for html_id in html_ids:
+            [uid, src] = html_id.replace('UID_','').replace('SRC_','').split('-')
+            link = "https://www.tripadvisor.fr/MemberOverlay?uid=%s&src=%s"%(uid, src)
+            yield Request(
+                link,
+                callback = self.parse_user,
+                meta = {
+                    'uid' : uid,
+                    'src' : src,
+                    'attraction_review_name' : response.meta['attraction_review_name']
+                }
+            )
+
+    def parse_user(self, response):
+        username = response.xpath('//*[contains(@class,"memberOverlayRedesign")]/a/@href').extract()[0]\
+            .replace('/Profile/', '')
+        nb_contributions = response.xpath('//*[@class="countsReviewEnhancements"]/li[1]/span[2]/text()').extract()[0]\
+            .replace('\xa0contributions','')
+        nb_cities_visited = response.xpath('//*[@class="countsReviewEnhancements"]/li[2]/span[2]/text()').extract()[0]\
+            .replace('\xa0villes visitées', '')
+
+        return User(
+            username = username,
+            uid = response.meta['uid'],
+            src = response.meta['src'],
+            nb_contributions = nb_contributions,
+            nb_cities_visited = nb_cities_visited,
+            attraction_review_name = response.meta['attraction_review_name']
+        )

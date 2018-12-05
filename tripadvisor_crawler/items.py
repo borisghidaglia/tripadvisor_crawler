@@ -24,13 +24,19 @@ class AttractionReview(scrapy.Item):
     d_value = scrapy.Field()
 
 class Review(scrapy.Item):
+    review_id = scrapy.Field()
     title = scrapy.Field()
     content = scrapy.Field()
     grade = scrapy.Field()
     attraction_review_name = scrapy.Field()
+    attraction_review_g_d = scrapy.Field()
     username = scrapy.Field()
 
 
 class User(scrapy.Item):
-    # @unique, tags, nb contribution, lieu de vie, nb de villes visitées,
-    pass
+    username = scrapy.Field()
+    uid = scrapy.Field()
+    src = scrapy.Field()
+    nb_contributions = scrapy.Field()
+    nb_cities_visited = scrapy.Field()
+    attraction_review_name = scrapy.Field()
