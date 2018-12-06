@@ -7,6 +7,8 @@ class DatabaseMongo:
 
     def __init__(self, db_name):
         self.db_name =db_name
+        self.client = pymongo.MongoClient()
+        self.db = self.client[db_name]
 
     def get_collection(self, collection_name):
         """Return a collection from database
@@ -22,9 +24,7 @@ class DatabaseMongo:
         Keyword arguments:
         filters -- a dict like so : { key1 : value1, key2 : value2, ..., keyN : valueN }
         """
-        client = pymongo.MongoClient()
-        db = client[self.db_name]
-        return db[collection_name].find(filters) if filters else db[collection_name].find()
+        return self.db[collection_name].find(filters) if filters else self.db[collection_name].find()
 
 
 class TripadvisorMongoDB(DatabaseMongo):
